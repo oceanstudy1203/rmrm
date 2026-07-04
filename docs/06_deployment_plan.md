@@ -595,3 +595,154 @@ Cloudflare Pages 或 Vercel 部署
 ```
 
 先让网站成为一个可信、稳定、能被访问的入口。等 App 内测反馈和运营方向更清晰后，再决定是否扩展后端、统计或更多页面。
+
+## 20. 当前 Cloudflare Pages 实际配置与安全提醒
+
+更新时间：2026-07-04。
+
+当前 `rmrm.me` 已经部署到 Cloudflare Pages，并连接 GitHub 仓库：
+
+```text
+GitHub 仓库：oceanstudy1203/rmrm
+Cloudflare Pages 项目：rmrm
+生产分支：main
+自动部署：已启用
+主域名：https://rmrm.me
+www 域名：https://www.rmrm.me
+Pages 临时域名：https://rmrm.pages.dev
+```
+
+### 20.1 DNS 记录
+
+Cloudflare DNS 当前只保留网站需要的两条记录：
+
+```text
+rmrm.me      CNAME  rmrm.pages.dev  已代理
+www.rmrm.me  CNAME  rmrm.pages.dev  已代理
+```
+
+安全提醒：
+
+- 不要添加陌生的 `A` 记录。
+- 不要添加指向陌生域名的 `CNAME`。
+- 如果看到不认识的 IP、域名或跳转相关记录，需要先暂停修改并排查。
+- Cloudflare 提示“邮件无法送达”可以暂时忽略，除非后续要使用 `@rmrm.me` 邮箱收发邮件。
+
+### 20.2 域名与跳转
+
+当前推荐主入口：
+
+```text
+https://rmrm.me
+```
+
+已配置 `www` 到根域名的 301 重定向：
+
+```text
+https://www.rmrm.me/* -> https://rmrm.me/${1}
+```
+
+安全提醒：
+
+- 对外发布、测试和应用市场资料中优先使用完整的 `https://rmrm.me`。
+- 不建议只写 `rmrm.me` 进行安全排查，因为不同浏览器可能先尝试 HTTP、搜索联想或读取旧缓存。
+- Cloudflare 规则里不应出现跳转到陌生外部域名的 Redirect Rule。
+
+### 20.3 SSL/TLS 与 HTTPS 设置
+
+Cloudflare `SSL/TLS` 当前建议保持：
+
+```text
+加密模式：Full 或 Full (strict)
+始终使用 HTTPS：开启
+最低 TLS 版本：TLS 1.2
+TLS 1.3：开启
+自动 HTTPS 重写：开启
+Universal SSL：保持启用
+```
+
+不要点击“禁用通用 SSL”。
+
+### 20.4 HSTS 设置
+
+Cloudflare 边缘证书中已启用 HSTS，当前建议配置：
+
+```text
+启用 HSTS：开启
+max-age：6 个月
+includeSubDomains：开启
+Preload：关闭
+```
+
+安全提醒：
+
+- `includeSubDomains` 开启后，未来新增 `api.rmrm.me`、`test.rmrm.me` 等子域名时，这些子域名也必须支持 HTTPS。
+- 在确认所有长期子域名都稳定支持 HTTPS 前，不要开启 HSTS Preload。
+- 代码中的 `_headers` 也已经添加 `Strict-Transport-Security`，Cloudflare 面板和静态文件响应头可以共同起到加固作用。
+
+### 20.5 静态站响应头
+
+Cloudflare Pages 根目录的 `_headers` 已添加安全响应头：
+
+```text
+Strict-Transport-Security
+Content-Security-Policy
+X-Frame-Options
+X-Content-Type-Options
+Referrer-Policy
+Permissions-Policy
+Cross-Origin-Opener-Policy
+Cross-Origin-Resource-Policy
+```
+
+其中 `rmrm.pages.dev` 临时域名额外设置：
+
+```text
+X-Robots-Tag: noindex
+```
+
+目的是让搜索引擎优先收录正式域名 `rmrm.me`，而不是 Pages 临时域名。
+
+### 20.6 Workers 路由
+
+当前 `rmrm.me` 的 Workers 路由为空。
+
+安全提醒：
+
+- 不要随意给 `rmrm.me/*` 或 `www.rmrm.me/*` 绑定 Worker。
+- 如果后续确实需要 Worker，必须先确认 Worker 源码、路由范围和回滚方案。
+- 如果出现陌生 Worker 路由，优先怀疑该路由可能接管了访问流量。
+
+### 20.7 异常跳转排查记录
+
+曾在个别手机浏览器、特定网络环境下看到过跳转到陌生博彩页面的截图，但后续在多浏览器、多网络下未能复现。当前已检查：
+
+```text
+源码中没有发现恶意 script、iframe、window.location 或 location.href 跳转。
+DNS 记录正常。
+Workers 路由为空。
+Cloudflare Pages 部署正常。
+线上响应头正常。
+www 到根域名跳转正常。
+HTTP 到 HTTPS 跳转正常。
+```
+
+如果未来再次出现异常跳转，应记录：
+
+- 发生时间。
+- 使用的网络：Wi-Fi、4G、5G。
+- 使用的浏览器。
+- 输入的是 `rmrm.me` 还是 `https://rmrm.me`。
+- 最终跳转到的完整域名。
+- 是否出现证书不可信提示。
+
+排查顺序：
+
+1. 使用完整 `https://rmrm.me` 重新测试。
+2. 切换 Wi-Fi 和手机流量测试。
+3. 使用无痕模式测试。
+4. 换浏览器测试。
+5. 检查 Cloudflare DNS、Redirect Rules、Workers 路由。
+6. 检查源码中是否新增了外链脚本或跳转代码。
+
+如果只有某个 Wi-Fi 或某个浏览器复现，优先排查网络 DNS、路由器、浏览器安全拦截或缓存；如果所有网络和浏览器都稳定复现，再排查站点源码和 Cloudflare 配置。
